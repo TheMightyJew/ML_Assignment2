@@ -152,7 +152,7 @@ def printSHAP(trained_model, records, list_to_plot):
     shap.initjs()
     for i in list_to_plot:
         shap_values = explainer.shap_values(records.iloc[i])
-        shap.force_plot(explainer.expected_value[1], shap_values[1], records.iloc[i], show=False, matplotlib=True)
+        shap.force_plot(round(explainer.expected_value[1], 3), shap_values[1], records.iloc[i].round(3), show=False, matplotlib=True)
         plt.pyplot.savefig('shap_plot_' + str(i) + '.png')
 
 

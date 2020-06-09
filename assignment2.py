@@ -101,10 +101,8 @@ def transform_categorical_columns(data, nominal_cols, dummies=False, labelencode
 
 
 def read_data(filename, dist_dict, dummies=False, labelencoder=False):
-    # path = '/kaggle/input/bgutreatmentoutcome/' + filename
-    path = 'C:/Users/levlerot/Desktop/machine learning/' + filename
-    path = 'data/' + filename
-    data = pd.read_csv(path)
+    path = 'data/'
+    data = pd.read_csv(path + filename)
     if len(dist_dict) > 0:
         for column_name in data.columns:
             if column_name not in dist_dict.keys():
@@ -115,7 +113,7 @@ def read_data(filename, dist_dict, dummies=False, labelencoder=False):
     nominal_cols, nominal_cols_indexes, binary_cols, numeric_cols = get_col_types(data)
     fill_missing_data(data, nominal_cols, binary_cols, numeric_cols, dist_dict)
     data = transform_categorical_columns(data, nominal_cols, dummies, labelencoder)
-    #data.to_csv('data/' + filename, sep=",")
+    data.to_csv(path + 'edited_' + filename, sep=",")
     return data, nominal_cols_indexes
 
 

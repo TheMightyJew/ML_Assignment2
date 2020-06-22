@@ -184,7 +184,7 @@ xgbClassifier = GridSearchCV(xgb.XGBClassifier(),
                     cv=3)
 '''
 
-catBoostClassifier = CatBoostClassifier(iterations=10000, learning_rate=0.01, depth=2, subsample=0.5, verbose=False)
+catBoostClassifier = CatBoostClassifier(iterations=10000, learning_rate=0.01, depth=2, subsample=0.5, verbose=False) # avg = 0.744
 
 svc = SVC(kernel='rbf', class_weight='balanced', gamma=0.01, C=1e3, probability=True)  # avg = 0.413
 
@@ -203,10 +203,11 @@ stackingClassifier = StackingClassifier(
 logisticRegression = LogisticRegression()
 
 # classifier = xgb.XGBClassifier(n_estimators= 2000, max_leaf_nodes= 4, random_state= 2, min_samples_split= 500, learning_rate= 0.03, subsample= 0.5)
-classifier = decisionTreeClassifier
-do_cross_val = True
+classifier = catBoostClassifier
+do_cross_val = False
+use_all_data_for_end_classifing = True
 saving_result = True
-num_of_folds = 2
+num_of_folds = 5
 
 dist_dict = {}
 if False:  # classifier is catBoostClassifier:
@@ -216,7 +217,7 @@ else:
     train_data, nominal_cols_indexes = read_data('train.CSV', dist_dict, labelencoder=True)
     test_data, _ = read_data('test.CSV', dist_dict, labelencoder=True)
 
-if do_cross_val:
+if use_all_data_for_end_classifing:
     X_train = train_data.iloc[:, train_data.columns != 'CLASS']
     Y_train = train_data["CLASS"]
 else:
@@ -278,7 +279,7 @@ if saving_result:
 
     print("time for fitting: %s seconds ---" % (time.time() - start_time))
     calculateAUC('Train', classifier, X_train, Y_train)
-    if not do_cross_val:
+    if not use_all_data_for_end_classifing:
         calculateAUC('Validate', classifier, X_validate, Y_validate)
     test_pred = classifier.predict_proba(test_data)[:, 1]
     write_prediction(test_pred)

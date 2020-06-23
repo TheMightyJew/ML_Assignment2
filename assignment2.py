@@ -18,7 +18,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
-from catboost import CatBoostClassifier
+from catboost import CatBoostClassifier, EFstrType, Pool
 import xgboost as xgb
 import lightgbm as lgb
 # from deepstack.ensemble import StackEnsemble
@@ -141,7 +141,7 @@ def calculateAUC(label, classifier, X, Y):
     return pred
 
 
-def printSHAP(trained_model, records, list_to_plot):
+def printSHAP(trained_model, records, classes, list_to_plot):
     import shap  # package used to calculate Shap values
 
     # Create object that can calculate shap values
@@ -149,10 +149,27 @@ def printSHAP(trained_model, records, list_to_plot):
 
     # Calculate Shap values
     shap.initjs()
-    for i in list_to_plot:
-        shap_values = explainer.shap_values(records.iloc[i])
-        shap.force_plot(round(explainer.expected_value[1], 3), shap_values[1], records.iloc[i].round(3), show=False, matplotlib=True)
-        plt.pyplot.savefig('shap_plot_' + str(i) + '.png')
+    if trained_model is catBoostClassifier:
+        explainer = shap.KernelExplainer(trained_model.predict_proba, X_train)
+        print([list(records.columns)[x] for x in nominal_cols_indexes])
+        shap_values = trained_model.get_feature_importance(Pool(records, classes),
+                                                           type=EFstrType.ShapValues, cat_features=[list(records.columns)[x] for x in nominal_cols_indexes])  # can use 'ShapValues' instead for the type, and categorical_columns is the list of the columns names where the values are categorical
+
+        # visualize the first prediction's explanation
+        shap.force_plot(explainer.expected_value[0], shap_values[0], feature_names=records.columns,
+                        out_names=list(classes.unique()))
+
+        # summarize the effects of all the features in a multi-class barplot
+        original_shape = shap_values.shape
+        shap_values_reshaped = shap_values.reshape(original_shape[1], original_shape[0], original_shape[-1])
+        shap.summary_plot(list(shap_values_reshaped[:, :, :-1]), features=records, class_names=classes.unique(),
+                          plot_type='bar')
+    else:
+        for i in list_to_plot:
+            shap_values = explainer.shap_values(records.iloc[i])
+            shap.force_plot(round(explainer.expected_value[1], 3), shap_values[1], records.iloc[i].round(3), show=False,
+                            matplotlib=True)
+            plt.pyplot.savefig('shap_plot_' + str(i) + '.png')
 
 
 gradientBoostingClassifier = GradientBoostingClassifier(n_estimators=3000, max_leaf_nodes=4, max_depth=None,
@@ -185,7 +202,9 @@ xgbClassifier = GridSearchCV(xgb.XGBClassifier(),
                     cv=3)
 '''
 
-catBoostClassifier = CatBoostClassifier(iterations=10000, learning_rate=0.01, depth=2, subsample=0.5, verbose=False) # avg = 0.748
+catBoostClassifier = CatBoostClassifier(learning_rate=0.05, subsample=0.5, verbose=False)# avg = 0.7497
+
+lgbClassifier = lgb.LGBMClassifier(learning_rate=0.05, subsample=0.5) # avg = 0.7445
 
 svc = SVC(kernel='rbf', class_weight='balanced', gamma=0.01, C=1e3, probability=True)  # avg = 0.413
 
@@ -205,7 +224,7 @@ logisticRegression = LogisticRegression()
 
 # classifier = xgb.XGBClassifier(n_estimators= 2000, max_leaf_nodes= 4, random_state= 2, min_samples_split= 500, learning_rate= 0.03, subsample= 0.5)
 classifier = catBoostClassifier
-do_cross_val = True
+do_cross_val = False
 use_all_data_for_end_classifing = True
 saving_result = True
 num_of_folds = 5
@@ -284,4 +303,4 @@ if saving_result:
         calculateAUC('Validate', classifier, X_validate, Y_validate)
     test_pred = classifier.predict_proba(test_data)[:, 1]
     write_prediction(test_pred)
-    printSHAP(classifier, X_train, [0, 5, 10])
+    printSHAP(classifier, X_train, Y_train, [0, 5, 10])

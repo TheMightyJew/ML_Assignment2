@@ -54,13 +54,14 @@ def fill_missing_data(data, nominal_cols, binary_cols, numeric_cols, dist_dict):
     for column_name in union_set:
         # data[column_name] = data[column_name].fillna(data[column_name].mode().iloc[0])
         if column_name not in dist_dict.keys():
-            distribution = data[column_name].dropna().value_counts(normalize=True)
+            distribution = data[column_name].fillna(data[column_name].mode().iloc[0])
+            # distribution = data[column_name].dropna().value_counts(normalize=True)
             dist_dict[column_name] = distribution
         else:
             distribution = dist_dict[column_name]
-        missing = data[column_name].isnull()
-        data.loc[missing, column_name] = np.random.choice(distribution.index, size=len(data[missing]),
-                                                          p=distribution.values)
+        data[column_name].fillna(distribution, inplace=True)
+        # missing = data[column_name].isnull()
+        # data.loc[missing, column_name] = np.random.choice(distribution.index, size=len(data[missing]), p=distribution.values)
 
     for column_name in numeric_cols:
         if column_name not in dist_dict.keys():
@@ -68,7 +69,7 @@ def fill_missing_data(data, nominal_cols, binary_cols, numeric_cols, dist_dict):
             dist_dict[column_name] = average
         else:
             average = dist_dict[column_name]
-        data[column_name].fillna((average), inplace=True)
+        data[column_name].fillna(average, inplace=True)
 
 
 def transform_categorical_columns(data, nominal_cols, dummies=False, labelencoder=False):
@@ -184,7 +185,7 @@ xgbClassifier = GridSearchCV(xgb.XGBClassifier(),
                     cv=3)
 '''
 
-catBoostClassifier = CatBoostClassifier(iterations=10000, learning_rate=0.01, depth=2, subsample=0.5, verbose=False) # avg = 0.744
+catBoostClassifier = CatBoostClassifier(iterations=10000, learning_rate=0.01, depth=2, subsample=0.5, verbose=False) # avg = 0.748
 
 svc = SVC(kernel='rbf', class_weight='balanced', gamma=0.01, C=1e3, probability=True)  # avg = 0.413
 
@@ -204,7 +205,7 @@ logisticRegression = LogisticRegression()
 
 # classifier = xgb.XGBClassifier(n_estimators= 2000, max_leaf_nodes= 4, random_state= 2, min_samples_split= 500, learning_rate= 0.03, subsample= 0.5)
 classifier = catBoostClassifier
-do_cross_val = False
+do_cross_val = True
 use_all_data_for_end_classifing = True
 saving_result = True
 num_of_folds = 5

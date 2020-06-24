@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 import csv
 import numpy as np
 from datetime import datetime
+import time
+import shap
 
-from IPython.core.display import display
 from sklearn.preprocessing import LabelEncoder
 from category_encoders import TargetEncoder
 from sklearn.model_selection import train_test_split
@@ -12,21 +13,17 @@ from sklearn.model_selection import cross_val_score
 from sklearn.metrics import roc_auc_score
 from sklearn import metrics
 from sklearn.model_selection import GridSearchCV
-
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
-from catboost import CatBoostClassifier, EFstrType, Pool
-import xgboost as xgb
-import lightgbm as lgb
-# from deepstack.ensemble import StackEnsemble
+from catboost import CatBoostClassifier
 from sklearn.ensemble import StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import ExtraTreesClassifier
-import time
-import shap
+from sklearn.svm import SVC
+import xgboost as xgb
+import lightgbm as lgb
 
 target_encoder = None
 
@@ -132,6 +129,7 @@ def calculate_auc(pred, actual):
     fpr, tpr, thresholds = metrics.roc_curve(actual, pred, pos_label=1)
     return metrics.auc(fpr, tpr)
 
+
 def draw_roc(y_test, preds):
     fpr, tpr, threshold = metrics.roc_curve(y_test, preds)
     roc_auc = metrics.auc(fpr, tpr)
@@ -148,6 +146,7 @@ def draw_roc(y_test, preds):
     plt.savefig('results/' + 'roc_curve.png')
     plt.close()
 
+
 def calculateAUC(label, classifier, X, Y):
     pred = classifier.predict(X)
     print(label + ':')
@@ -159,6 +158,7 @@ def calculateAUC(label, classifier, X, Y):
 
 
 def printSHAP(trained_model, data, X, list_to_plot):
+    # summary plots
     shap_values = shap.TreeExplainer(trained_model).shap_values(X)
     shap.summary_plot(shap_values, X, plot_type="bar", show=False)
     plt.savefig('results/Shap/' + 'shap_summary_bar.png')
@@ -166,15 +166,17 @@ def printSHAP(trained_model, data, X, list_to_plot):
     shap.summary_plot(shap_values, X, show=False)
     plt.savefig('results/Shap/' + 'shap_summary.png')
     plt.close()
-    # Initialize your Jupyter notebook with initjs(), otherwise you will get an error message.
+
     shap.initjs()
 
+    # importance
     shap_sum = np.abs(shap_values).mean(axis=0)
     importance_df = pd.DataFrame([X.columns.tolist(), shap_sum.tolist()]).T
     importance_df.columns = ['column_name', 'shap_importance']
     importance_df = importance_df.sort_values('shap_importance', ascending=False)
     importance_df.to_csv('results/Shap/' + 'features_importance.csv')
 
+    # depentence contribution plots
     features_list = list(importance_df['column_name'][:5].values)
     for feature in features_list:
         shap.dependence_plot(feature, shap_values, X, interaction_index=None, show=False)
@@ -182,6 +184,7 @@ def printSHAP(trained_model, data, X, list_to_plot):
                     feature + '.png')
         plt.close()
 
+    # explainer plots for single records
     explainerModel = shap.TreeExplainer(trained_model)
     shap_values_Model = explainerModel.shap_values(data)
     for j in list_to_plot:
@@ -207,17 +210,17 @@ adaBoostClassifier = AdaBoostClassifier(base_estimator=DecisionTreeClassifier(ma
                                         n_estimators=300)  # avg = 0.715
 
 parameters = {
-     "eta"    : [0.05, 0.10, 0.15, 0.20, 0.25, 0.30 ] ,
-     "max_depth"        : [ 3, 4, 5, 6, 8, 10, 12, 15],
-     "min_child_weight" : [ 1, 3, 5, 7 ],
-     "gamma"            : [ 0.0, 0.1, 0.2 , 0.3, 0.4 ],
-     "colsample_bytree" : [ 0.3, 0.4, 0.5 , 0.7 ]
-     }
+    "eta": [0.05, 0.10, 0.15, 0.20, 0.25, 0.30],
+    "max_depth": [3, 4, 5, 6, 8, 10, 12, 15],
+    "min_child_weight": [1, 3, 5, 7],
+    "gamma": [0.0, 0.1, 0.2, 0.3, 0.4],
+    "colsample_bytree": [0.3, 0.4, 0.5, 0.7]
+}
 
 xgbClassifierGrid = GridSearchCV(xgb.XGBClassifier(),
-                    parameters, n_jobs=4,
-                    scoring="neg_log_loss",
-                    cv=3)
+                                 parameters, n_jobs=4,
+                                 scoring="neg_log_loss",
+                                 cv=3)
 
 catBoostClassifier = CatBoostClassifier(learning_rate=0.05, subsample=0.5, verbose=False)  # avg = 0.7497
 
@@ -259,8 +262,6 @@ if use_all_data_for_end_classifing:
 else:
     X_train, X_validate, Y_train, Y_validate = train_test_split(train_data.iloc[:, train_data.columns != 'CLASS'],
                                                                 train_data["CLASS"], test_size=0.3, random_state=42)
-
-
 
 if do_cross_val:
     print('Doing cross val')

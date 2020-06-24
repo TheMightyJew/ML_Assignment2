@@ -121,7 +121,7 @@ def read_data(filename, dist_dict, dummies=False, labelencoder=False):
 
 def write_prediction(pred):
     current_time = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-    with open('results/test_pred_' + current_time + '.csv', 'w', newline='') as csvfile:
+    with open('results/Predictions/' + 'test_pred_' + current_time + '.csv', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerow(['Id'] + ['ProbToYes'])
         for index in range(len(pred)):
@@ -145,7 +145,7 @@ def draw_roc(y_test, preds):
     plt.ylim([0, 1])
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig('roc_curve.png')
+    plt.savefig('results/' + 'roc_curve.png')
     plt.close()
 
 def calculateAUC(label, classifier, X, Y):
@@ -161,19 +161,37 @@ def calculateAUC(label, classifier, X, Y):
 def printSHAP(trained_model, data, X, list_to_plot):
     shap_values = shap.TreeExplainer(trained_model).shap_values(X)
     shap.summary_plot(shap_values, X, plot_type="bar", show=False)
-    plt.savefig('shap_summary_bar.png')
+    plt.savefig('results/Shap/' + 'shap_summary_bar.png')
+    plt.close()
     shap.summary_plot(shap_values, X, show=False)
-    plt.savefig('shap_summary.png')
-
+    plt.savefig('results/Shap/' + 'shap_summary.png')
+    plt.close()
     # Initialize your Jupyter notebook with initjs(), otherwise you will get an error message.
     shap.initjs()
+
+    shap_sum = np.abs(shap_values).mean(axis=0)
+    importance_df = pd.DataFrame([X.columns.tolist(), shap_sum.tolist()]).T
+    importance_df.columns = ['column_name', 'shap_importance']
+    importance_df = importance_df.sort_values('shap_importance', ascending=False)
+    importance_df.to_csv('results/Shap/' + 'features_importance.csv')
+
+    features_list = list(importance_df['column_name'][:5].values)
+    for i in range(len(features_list)-1):
+        for j in range(i+1, len(features_list)):
+            shap.dependence_plot(features_list[i], shap_values, X, interaction_index=features_list[j], show=False)
+            plt.savefig('results/Shap/Dependence_Contribution/' + features_list[i] + '_Dependence_Contribution_' + features_list[j] + '.png')
+            plt.close()
+            shap.dependence_plot(features_list[j], shap_values, X, interaction_index=features_list[i], show=False)
+            plt.savefig('results/Shap/Dependence_Contribution/' + features_list[j] + '_Dependence_Contribution_' + features_list[i] + '.png')
+            plt.close()
 
     explainerModel = shap.TreeExplainer(trained_model)
     shap_values_Model = explainerModel.shap_values(data)
     for j in list_to_plot:
         shap.force_plot(explainerModel.expected_value, shap_values_Model[j], train_data.iloc[[j]], show=False,
                         matplotlib=True)
-        plt.savefig('shap_explainer_' + str(j) + '.png')
+        plt.savefig('results/Shap/' + 'shap_explainer_' + str(j) + '.png')
+        plt.close()
 
 
 gradientBoostingClassifier = GradientBoostingClassifier(n_estimators=3000, max_leaf_nodes=4, max_depth=None,

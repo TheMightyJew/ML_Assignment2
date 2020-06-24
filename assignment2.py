@@ -1,5 +1,5 @@
 import pandas as pd
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import csv
 import numpy as np
 from datetime import datetime
@@ -26,6 +26,7 @@ from sklearn.ensemble import StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import ExtraTreesClassifier
 import time
+import shap
 
 target_encoder = None
 
@@ -131,6 +132,21 @@ def calculate_auc(pred, actual):
     fpr, tpr, thresholds = metrics.roc_curve(actual, pred, pos_label=1)
     return metrics.auc(fpr, tpr)
 
+def draw_roc(y_test, preds):
+    fpr, tpr, threshold = metrics.roc_curve(y_test, preds)
+    roc_auc = metrics.auc(fpr, tpr)
+
+    # method I: plt
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.savefig('roc_curve.png')
+    plt.close()
 
 def calculateAUC(label, classifier, X, Y):
     pred = classifier.predict(X)
@@ -138,38 +154,26 @@ def calculateAUC(label, classifier, X, Y):
     print('\tScore: ' + str(classifier.score(X, Y)))
     print('\tAUC: ' + str(roc_auc_score(Y, pred)))
     print('\tAUC PROB: ' + str(roc_auc_score(Y, classifier.predict_proba(X)[:, 1])))
+    draw_roc(Y, classifier.predict_proba(X)[:, 1])
     return pred
 
 
-def printSHAP(trained_model, records, classes, list_to_plot):
-    import shap  # package used to calculate Shap values
+def printSHAP(trained_model, data, X, list_to_plot):
+    shap_values = shap.TreeExplainer(trained_model).shap_values(X)
+    shap.summary_plot(shap_values, X, plot_type="bar", show=False)
+    plt.savefig('shap_summary_bar.png')
+    shap.summary_plot(shap_values, X, show=False)
+    plt.savefig('shap_summary.png')
 
-    # Create object that can calculate shap values
-    explainer = shap.TreeExplainer(trained_model)
-
-    # Calculate Shap values
+    # Initialize your Jupyter notebook with initjs(), otherwise you will get an error message.
     shap.initjs()
-    if trained_model is catBoostClassifier:
-        explainer = shap.KernelExplainer(trained_model.predict_proba, X_train)
-        print([list(records.columns)[x] for x in nominal_cols_indexes])
-        shap_values = trained_model.get_feature_importance(Pool(records, classes),
-                                                           type=EFstrType.ShapValues, cat_features=[list(records.columns)[x] for x in nominal_cols_indexes])  # can use 'ShapValues' instead for the type, and categorical_columns is the list of the columns names where the values are categorical
 
-        # visualize the first prediction's explanation
-        shap.force_plot(explainer.expected_value[0], shap_values[0], feature_names=records.columns,
-                        out_names=list(classes.unique()))
-
-        # summarize the effects of all the features in a multi-class barplot
-        original_shape = shap_values.shape
-        shap_values_reshaped = shap_values.reshape(original_shape[1], original_shape[0], original_shape[-1])
-        shap.summary_plot(list(shap_values_reshaped[:, :, :-1]), features=records, class_names=classes.unique(),
-                          plot_type='bar')
-    else:
-        for i in list_to_plot:
-            shap_values = explainer.shap_values(records.iloc[i])
-            shap.force_plot(round(explainer.expected_value[1], 3), shap_values[1], records.iloc[i].round(3), show=False,
-                            matplotlib=True)
-            plt.pyplot.savefig('shap_plot_' + str(i) + '.png')
+    explainerModel = shap.TreeExplainer(trained_model)
+    shap_values_Model = explainerModel.shap_values(data)
+    for j in list_to_plot:
+        shap.force_plot(explainerModel.expected_value, shap_values_Model[j], train_data.iloc[[j]], show=False,
+                        matplotlib=True)
+        plt.savefig('shap_explainer_' + str(j) + '.png')
 
 
 gradientBoostingClassifier = GradientBoostingClassifier(n_estimators=3000, max_leaf_nodes=4, max_depth=None,
@@ -187,7 +191,6 @@ decisionTreeClassifier = DecisionTreeClassifier(min_samples_split=500)  # avg = 
 adaBoostClassifier = AdaBoostClassifier(base_estimator=DecisionTreeClassifier(max_depth=3), algorithm="SAMME",
                                         n_estimators=300)  # avg = 0.715
 
-'''
 parameters = {
      "eta"    : [0.05, 0.10, 0.15, 0.20, 0.25, 0.30 ] ,
      "max_depth"        : [ 3, 4, 5, 6, 8, 10, 12, 15],
@@ -196,15 +199,14 @@ parameters = {
      "colsample_bytree" : [ 0.3, 0.4, 0.5 , 0.7 ]
      }
 
-xgbClassifier = GridSearchCV(xgb.XGBClassifier(),
+xgbClassifierGrid = GridSearchCV(xgb.XGBClassifier(),
                     parameters, n_jobs=4,
                     scoring="neg_log_loss",
                     cv=3)
-'''
 
-catBoostClassifier = CatBoostClassifier(learning_rate=0.05, subsample=0.5, verbose=False)# avg = 0.7497
+catBoostClassifier = CatBoostClassifier(learning_rate=0.05, subsample=0.5, verbose=False)  # avg = 0.7497
 
-lgbClassifier = lgb.LGBMClassifier(learning_rate=0.05, subsample=0.5) # avg = 0.7445
+lgbClassifier = lgb.LGBMClassifier(learning_rate=0.05, subsample=0.5)  # avg = 0.7445
 
 svc = SVC(kernel='rbf', class_weight='balanced', gamma=0.01, C=1e3, probability=True)  # avg = 0.413
 
@@ -222,7 +224,6 @@ stackingClassifier = StackingClassifier(
 
 logisticRegression = LogisticRegression()
 
-# classifier = xgb.XGBClassifier(n_estimators= 2000, max_leaf_nodes= 4, random_state= 2, min_samples_split= 500, learning_rate= 0.03, subsample= 0.5)
 classifier = catBoostClassifier
 do_cross_val = False
 use_all_data_for_end_classifing = True
@@ -230,7 +231,7 @@ saving_result = True
 num_of_folds = 5
 
 dist_dict = {}
-if False:  # classifier is catBoostClassifier:
+if classifier is catBoostClassifier:
     train_data, nominal_cols_indexes = read_data('train.CSV', dist_dict)
     test_data, _ = read_data('test.CSV', dist_dict)
 else:
@@ -244,40 +245,7 @@ else:
     X_train, X_validate, Y_train, Y_validate = train_test_split(train_data.iloc[:, train_data.columns != 'CLASS'],
                                                                 train_data["CLASS"], test_size=0.3, random_state=42)
 
-'''
-train_data_lgb = lgb.Dataset(X_train, label=Y_train, categorical_feature=nominal_cols_indexes)
-test_data_lgb = lgb.Dataset(X_validate, label=Y_validate)
 
-
-#
-# Train the model
-#
-
-parameters = {
-    'application': 'binary',
-    'objective': 'binary',
-    'metric': 'auc',
-    'is_unbalance': 'true',
-    'boosting': 'gbdt',
-    'num_leaves': 31,
-    'feature_fraction': 0.5,
-    'bagging_fraction': 0.5,
-    'bagging_freq': 20,
-    'learning_rate': 0.001,
-    'n_estimators': 10000,
-    'verbose': 0
-}
-
-model = lgb.train(parameters,
-                       train_data_lgb,
-                       valid_sets=test_data_lgb,
-                       num_boost_round=50000,
-                       early_stopping_rounds=10000)
-
-test_pred = model.predict(test_data)
-write_prediction(test_pred)
-
-'''
 
 if do_cross_val:
     print('Doing cross val')
@@ -292,7 +260,7 @@ else:
 
 if saving_result:
     start_time = time.time()
-    if False:  # classifier is catBoostClassifier:
+    if classifier is catBoostClassifier:
         classifier.fit(X_train, Y_train, nominal_cols_indexes)
     else:
         classifier.fit(X_train, Y_train)
@@ -303,4 +271,4 @@ if saving_result:
         calculateAUC('Validate', classifier, X_validate, Y_validate)
     test_pred = classifier.predict_proba(test_data)[:, 1]
     write_prediction(test_pred)
-    printSHAP(classifier, X_train, Y_train, [0, 5, 10])
+    printSHAP(classifier, train_data, X_train, [0, 5, 10])

@@ -176,14 +176,11 @@ def printSHAP(trained_model, data, X, list_to_plot):
     importance_df.to_csv('results/Shap/' + 'features_importance.csv')
 
     features_list = list(importance_df['column_name'][:5].values)
-    for i in range(len(features_list)-1):
-        for j in range(i+1, len(features_list)):
-            shap.dependence_plot(features_list[i], shap_values, X, interaction_index=features_list[j], show=False)
-            plt.savefig('results/Shap/Dependence_Contribution/' + features_list[i] + '_Dependence_Contribution_' + features_list[j] + '.png')
-            plt.close()
-            shap.dependence_plot(features_list[j], shap_values, X, interaction_index=features_list[i], show=False)
-            plt.savefig('results/Shap/Dependence_Contribution/' + features_list[j] + '_Dependence_Contribution_' + features_list[i] + '.png')
-            plt.close()
+    for feature in features_list:
+        shap.dependence_plot(feature, shap_values, X, interaction_index=None, show=False)
+        plt.savefig('results/Shap/Dependence_Contribution/' + 'Dependence_Contribution_' +
+                    feature + '.png')
+        plt.close()
 
     explainerModel = shap.TreeExplainer(trained_model)
     shap_values_Model = explainerModel.shap_values(data)
